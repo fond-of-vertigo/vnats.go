@@ -14,11 +14,14 @@ func (c *Connection) NewPublisher(args PublisherArgs) (*Publisher, error) {
 	if err := validateStreamName(args.StreamName); err != nil {
 		return nil, err
 	}
+
+	replicas := c.validateReplicas(args.Replicas)
+
 	if err := c.nats.EnsureStreamExists(&nats.StreamConfig{
 		Name:       args.StreamName,
 		Subjects:   []string{args.StreamName + ".>"},
 		Storage:    defaultStorageType,
-		Replicas:   len(c.nats.Servers()),
+		Replicas:   replicas,
 		Duplicates: defaultDuplicationWindow,
 		MaxAge:     time.Hour * 24 * 30,
 	}); err != nil {
@@ -74,4 +77,15 @@ func validateStreamName(streamName string) error {
 		return fmt.Errorf("streamName cannot contain any of chars: *.>")
 	}
 	return nil
+}
+
+// return the number of replicas between 3 and 5
+func (c *Connection) validateReplicas(replicas int) int {
+	if replicas < 1 {
+		replicas = len(c.nats.Servers())
+	}
+	if replicas < 1 || replicas > 5 {
+		return 3
+	}
+	return replicas
 }
